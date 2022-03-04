@@ -2,6 +2,9 @@ from http import HTTPStatus
 from flask import Flask, jsonify, request, safe_join, send_file, send_from_directory
 import os
 
+from app.kenzie import create_dir, filepath_with_safe, show_files, download_query_params
+
+
 ALLOWED_EXTENSIONS = {"png", "jpg", "gif"}
 
 app = Flask(__name__)
@@ -11,22 +14,6 @@ IMAGES_DIRECTORY = os.getenv("IMAGES_DIRECTORY")
 
 
 # CRIA OS DIRETORIO DE IMAGENS
-def create_dir():
-
-    try:
-        path_images = os.path.join("./", "images")
-        path_png = os.path.join("./images", "png")
-        path_jpg = os.path.join("./images", "jpg")
-        path_gif = os.path.join("./images", "gif")
-
-        os.makedirs(path_images)
-        os.makedirs(path_png)
-        os.makedirs(path_jpg)
-        os.makedirs(path_gif)
-    except:
-        ...
-
-
 create_dir()
 
 
@@ -61,13 +48,7 @@ def post_multipart_file():
 @app.get("/files")
 def show_all_files():
 
-    files_list = []
-
-    files_png = os.listdir("./images/png")
-    file_jpg = os.listdir("./images/jpg")
-    file_gif = os.listdir("./images/gif")
-
-    files_list.extend(files_png + file_jpg + file_gif)
+    files_list = show_files()
 
     return jsonify(files_list), HTTPStatus.OK
 
@@ -86,9 +67,8 @@ def show_extension_files(file_format):
 # FAZ O DOWNLOAD DOS ARQUIVOS
 @app.get("/download/<filename>")
 def download(filename: str):
-    file_extension = filename[-3::]
-    abs_path = os.path.abspath(f"./images/{file_extension}")
-    filepath = safe_join(abs_path, filename)
+
+    filepath = filepath_with_safe(filename)
 
     try:
         return send_file(filepath, as_attachment=True), HTTPStatus.OK
@@ -100,10 +80,7 @@ def download(filename: str):
 @app.get("/download-zip")
 def download_zip():
 
-    default_extension = "jpg"
-    file_type = request.args.get("file_type")
-    file_extension = file_type if file_type else default_extension
-    compression_rate = request.args.get("compression_rate", 6)
+    file_type, file_extension, compression_rate = download_query_params(request.args)
 
     try:
 
@@ -115,7 +92,7 @@ def download_zip():
                 "message": f"Não existem arquivos com esses formato"
             }, HTTPStatus.NOT_FOUND
         print("aqui")
-        # os.system(f"zip -{compression_rate} -r -j /tmp/{file_extension}")
+
         os.system(
             f"zip -r /tmp/{file_extension} {IMAGES_DIRECTORY}/{file_type} -{compression_rate}"
         )
